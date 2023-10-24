@@ -109,15 +109,6 @@ function M.generate_schema()
 	yamlls_restart()
 end
 
-function M.yamlls_patch()
-	yamlls_patch()
-	yamlls_restart()
-end
-
-function M.yamlls_is_patched()
-	return yamlls_is_patched()
-end
-
 function M.yamlls_schema()
 	return "file://" .. PATH_SCHEMA
 end
