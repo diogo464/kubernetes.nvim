@@ -9,7 +9,7 @@ This plugin requires the `kubectl` binary and the `yamlls` language server
 installed through `mason.nvim`. The `kubectl` binary must be able to contact
 the a kubernetes cluster to fetch the resource definitions.
 
-# INSTALLATION AND SETUP
+# Installation and Setup
 
 To install the plugin any of the package managers should work.
 To install using `lazy.nvim` just add the following line next to the other
@@ -45,7 +45,7 @@ Generates the schema file, replacing any existing one, and restarts yamlls.
 
 Returns the path to the schema file that should be given to yamlls.
 
-# HOW IT WORKS
+# How it works
 
 In here I will just briefly describe how this plugin works and write down any
 notes that might be useful when I come back to this later.
