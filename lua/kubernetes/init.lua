@@ -113,6 +113,14 @@ function M.yamlls_schema()
 	return "file://" .. PATH_SCHEMA
 end
 
+function M.yamlls_patch()
+	return yamlls_patch()
+end
+
+function M.yamlls_is_patched()
+	return yamlls_is_patched()
+end
+
 vim.api.nvim_create_user_command("KubernetesGenerateSchema", function()
 	require('kubernetes').generate_schema()
 end, { desc = "Generate the schema from the current kubernetes cluster and restart yamlls" })
