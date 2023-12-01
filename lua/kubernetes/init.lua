@@ -2,7 +2,7 @@ local PATH_DATA = vim.fn.stdpath("data") .. "/kubernetes.nvim/"
 local PATH_DEFINITIONS = PATH_DATA .. "definitions.json"
 local PATH_SCHEMA = PATH_DATA .. "schema.json"
 local PATH_YAMLLS_VALIDATION_JS = vim.fn.stdpath("data") ..
-	"/mason/packages/yaml-language-server/node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js"
+		"/mason/packages/yaml-language-server/node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js"
 local YAMLLS_PATCH_PATTERN = "isKubernetes && err.message === this.MATCHES_MULTIPLE"
 local YAMLLS_PATH_REPLACEMENT = "err.message === this.MATCHES_MULTIPLE"
 
@@ -23,6 +23,23 @@ local function kubectl_fetch_definitions()
 	local schema = vim.json.decode(table.concat(output, ""))
 	if schema == nil then error("failed to decode schema from json") end
 	return { definitions = schema["definitions"] }
+end
+
+--- returns a list of filetypes
+---@return table
+local function kubectl_kinds()
+	local output = {}
+	local chan = vim.fn.jobstart({ "kubectl", "api-resources", "--no-headers" }, {
+		stdout_buffered = true,
+		on_stdout = function(_, data, _)
+			for i = 1, #data do
+				output[#output + 1] = data[i]
+			end
+		end
+	})
+	if chan <= 0 then error("failed to run kubectl to fetch kinds") end
+	vim.fn.jobwait({ chan })
+	return output
 end
 
 --- patches the definitions to include an enum in the `kind` it exists
@@ -111,6 +128,17 @@ end
 
 function M.yamlls_schema()
 	return "file://" .. PATH_SCHEMA
+end
+
+function M.yamlls_filetypes()
+	local filetypes = {}
+	local kinds = kubectl_kinds()
+	for _, k in ipairs(kinds) do
+		local kind = k:gsub(".* (%w+)$", "%1"):lower()
+		table.insert(filetypes, "*." .. kind .. ".yml")
+		table.insert(filetypes, "*." .. kind .. ".yaml")
+	end
+	return filetypes
 end
 
 function M.yamlls_patch()

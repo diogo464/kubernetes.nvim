@@ -24,7 +24,8 @@ insert the schema like in the example below.
       yamlls = {
         yaml = {
           schemas = {
-            [require('kubernetes').yamlls_schema()] = "*.yaml",
+            kubernetes = require('kubernetes').yamlls_filetypes(),
+            [require('kubernetes').yamlls_schema()] = { "*.yaml", "*.yml" }
           }
         }
       }
@@ -87,17 +88,6 @@ This can be achieved like so: `kubectl get --raw /openapi/v2 | jq '.definitions'
 The `schema.json` is that `all.json` file that has the `oneOf`.
 To do this just get all iterate the `definitions.json` and add the appropriate entry into `schema.json`. To reference a local file use `file://<full path>#/definitions/...`.
 
-3. Patch the yaml language server.\ 
-Right now kubernetes support seems to be hardcoded into `yamlls`. Trying to use this generated schema without modifications will give out the error `Matches multiple schemas when only one must validate.`. The language server has an check to see if the current document is a kubernetes document and if so then ignore that error.
-```
-https://github.com/redhat-developer/yaml-language-server/blob/ed03cbf71ade29ea62b4bcac0d8952195fd6969d/src/languageservice/services/yamlValidation.ts#L122
-```
-But from what I could find the only way of having a document be a kubernetes document is if the uri of the schema file associated with that document is the hardcoded one.
-```
-https://github.com/redhat-developer/yaml-language-server/blob/main/src/languageservice/utils/schemaUrls.ts#L8
-```
-The language server has an option to use an http proxy and I initially tought that we could just make a proxy, then intercept any requests to that uri and return our own. But it turns out http proxies don't proxy individual requests and instead just forward the byte stream to another server and since the request for that uri will be made over httpt this option doesn't really work.
-
-So instead of doing any of that remove the check we can just remove the requirement for a document to be a kubernetes document and always ignore that error. Since the language server is written in javascript that turns out to be quite simple, it is just a string replacement.
+3. Patch the yaml language server.
 
 And thats it, now it works.
