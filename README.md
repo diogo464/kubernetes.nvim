@@ -24,7 +24,10 @@ insert the schema like in the example below.
       yamlls = {
         yaml = {
           schemas = {
+            -- use this if you want to match all '*.yaml' files
             [require('kubernetes').yamlls_schema()] = "*.yaml",
+            -- or this to only match '*.<resource>.yaml' files. ex: 'app.deployment.yaml', 'app.argocd.yaml', ...
+            [require('kubernetes').yamlls_schema()] = require('kubernetes').yamlls_filetypes()
           }
         }
       }
