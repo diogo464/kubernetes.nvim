@@ -2,7 +2,7 @@ local PATH_DATA = vim.fn.stdpath("data") .. "/kubernetes.nvim/"
 local PATH_DEFINITIONS = PATH_DATA .. "definitions.json"
 local PATH_SCHEMA = PATH_DATA .. "schema.json"
 local PATH_YAMLLS_VALIDATION_JS = vim.fn.stdpath("data") ..
-		"/mason/packages/yaml-language-server/node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js"
+	"/mason/packages/yaml-language-server/node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js"
 local YAMLLS_PATCH_PATTERN = "isKubernetes && err.message === this.MATCHES_MULTIPLE"
 local YAMLLS_PATH_REPLACEMENT = "err.message === this.MATCHES_MULTIPLE"
 
