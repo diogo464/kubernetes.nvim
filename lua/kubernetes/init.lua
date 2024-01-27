@@ -46,6 +46,12 @@ local function kubectl_fetch_definitions()
 	return { definitions = schema["definitions"] }
 end
 
+--- returns a list of kinds
+---@return table
+local function kubectl_kinds()
+	return cmd({ "kubectl", "api-resources", "--no-headers" })
+end
+
 --- patches the definitions to include an enum in the `kind` it exists
 ---@param definitions table
 local function patch_definitions_kind(definitions)
@@ -132,6 +138,21 @@ end
 
 function M.yamlls_schema()
 	return "file://" .. PATH_SCHEMA
+end
+
+---@return table containing all valid kube filetypes
+function M.yamlls_filetypes()
+	local filetypes = {}
+	local kinds = kubectl_kinds()
+	for _, k in ipairs(kinds) do
+		-- Grab last column
+		local kind = k:gsub(".* (%w+)$", "%1"):lower()
+		if kind ~= "" then
+			table.insert(filetypes, "*." .. kind .. ".yml")
+			table.insert(filetypes, "*." .. kind .. ".yaml")
+		end
+	end
+	return filetypes
 end
 
 function M.yamlls_patch()
