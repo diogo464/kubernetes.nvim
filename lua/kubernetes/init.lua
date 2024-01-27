@@ -147,9 +147,10 @@ function M.yamlls_filetypes()
 	for _, k in ipairs(kinds) do
 		-- Grab last column
 		local kind = k:gsub(".* (%w+)$", "%1"):lower()
-
-		table.insert(filetypes, "*." .. kind .. ".yml")
-		table.insert(filetypes, "*." .. kind .. ".yaml")
+		if kind ~= "" then
+			table.insert(filetypes, "*." .. kind .. ".yml")
+			table.insert(filetypes, "*." .. kind .. ".yaml")
+		end
 	end
 	return filetypes
 end
