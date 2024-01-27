@@ -6,20 +6,41 @@ local PATH_YAMLLS_VALIDATION_JS = vim.fn.stdpath("data") ..
 local YAMLLS_PATCH_PATTERN = "isKubernetes && err.message === this.MATCHES_MULTIPLE"
 local YAMLLS_PATH_REPLACEMENT = "err.message === this.MATCHES_MULTIPLE"
 
+--- run a job and return the lines from stdout.
+--- errors if the job fails to start or the exit code is not 0.
+---@param args string[]
+---@return string[] stdout stdout lines
+local function cmd(args)
+	local stdout = {}
+	local stderr = ""
+	local chan = vim.fn.jobstart(args, {
+		stdout_buffered = true,
+		stderr_buffered = true,
+		on_stdout = function(_, data, _)
+			for i = 1, #data do
+				stdout[#stdout + 1] = data[i]
+			end
+		end,
+		on_stderr = function(_, data, _)
+			stderr = table.concat(data, "\n")
+		end
+	})
+	if chan <= 0 then
+		error("failed to spawn job for '" .. table.concat(args, " ") .. "'")
+	end
+	local exit_codes = vim.fn.jobwait({ chan })
+	local exit_code = exit_codes[1]
+	if exit_code ~= 0 then
+		error("failed to execute '" ..
+		table.concat(args, " ") .. "'. exit code: " .. tostring(exit_code) .. "\n" .. stderr)
+	end
+	return stdout
+end
+
 --- fetches the current cluster'rs schema using kubectl
 ---@return table definitions the definitions section of the schema
 local function kubectl_fetch_definitions()
-	local output = {}
-	local chan = vim.fn.jobstart({ "kubectl", "get", "--raw", "/openapi/v2" }, {
-		stdout_buffered = true,
-		on_stdout = function(_, data, _)
-			for i = 1, #data do
-				output[#output + 1] = data[i]
-			end
-		end
-	})
-	if chan <= 0 then error("failed to run kubectl to fetch definitions") end
-	vim.fn.jobwait({ chan })
+	local output = cmd({ "kubectl", "get", "--raw", "/openapi/v2" })
 	local schema = vim.json.decode(table.concat(output, ""))
 	if schema == nil then error("failed to decode schema from json") end
 	return { definitions = schema["definitions"] }
