@@ -49,18 +49,7 @@ end
 --- returns a list of kinds
 ---@return table
 local function kubectl_kinds()
-	local output = {}
-	local chan = vim.fn.jobstart({ "kubectl", "api-resources", "--no-headers" }, {
-		stdout_buffered = true,
-		on_stdout = function(_, data, _)
-			for i = 1, #data do
-				output[#output + 1] = data[i]
-			end
-		end
-	})
-	if chan <= 0 then error("failed to run kubectl to fetch kinds") end
-	vim.fn.jobwait({ chan })
-	return output
+	return cmd({ "kubectl", "api-resources", "--no-headers" })
 end
 
 --- patches the definitions to include an enum in the `kind` it exists
