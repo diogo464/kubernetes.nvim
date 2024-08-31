@@ -10,7 +10,7 @@ local YAMLLS_PATH_REPLACEMENT = "err.message === this.MATCHES_MULTIPLE"
 --- errors if the job fails to start or the exit code is not 0.
 ---@param args string[]
 ---@return string[] stdout stdout lines
-local function cmd(args)
+local function cmd_blocking(args)
 	local stdout = {}
 	local stderr = ""
 	local chan = vim.fn.jobstart(args, {
@@ -23,7 +23,7 @@ local function cmd(args)
 		end,
 		on_stderr = function(_, data, _)
 			stderr = table.concat(data, "\n")
-		end
+		end,
 	})
 	if chan <= 0 then
 		error("failed to spawn job for '" .. table.concat(args, " ") .. "'")
@@ -32,24 +32,64 @@ local function cmd(args)
 	local exit_code = exit_codes[1]
 	if exit_code ~= 0 then
 		error("failed to execute '" ..
-		table.concat(args, " ") .. "'. exit code: " .. tostring(exit_code) .. "\n" .. stderr)
+			table.concat(args, " ") .. "'. exit code: " .. tostring(exit_code) .. "\n" .. stderr)
 	end
 	return stdout
 end
 
+--- run a job and return the lines from stdout.
+--- errors if the job fails to start or the exit code is not 0.
+---@param args string[]
+---@param on_success function(string[])
+---@param on_error function(number)
+local function cmd_async(args, on_success, on_error)
+	local stdout = {}
+	local stderr = ""
+	local chan = vim.fn.jobstart(args, {
+		stdout_buffered = true,
+		stderr_buffered = true,
+		on_stdout = function(_, data, _)
+			for i = 1, #data do
+				stdout[#stdout + 1] = data[i]
+			end
+		end,
+		on_stderr = function(_, data, _)
+			stderr = table.concat(data, "\n")
+		end,
+		on_exit = function(_, exit_code, _)
+			if exit_code == 0 then
+				if on_success ~= nil then
+					on_success(stdout)
+				end
+			else
+				if on_error ~= nil then
+					on_error(exit_code)
+				else
+					error("failed to execute '" ..
+						table.concat(args, " ") .. "'. exit code: " .. tostring(exit_code) .. "\n" .. stderr)
+				end
+			end
+		end
+	})
+	if chan <= 0 then
+		error("failed to spawn job for '" .. table.concat(args, " ") .. "'")
+	end
+end
+
 --- fetches the current cluster'rs schema using kubectl
----@return table definitions the definitions section of the schema
-local function kubectl_fetch_definitions()
-	local output = cmd({ "kubectl", "get", "--raw", "/openapi/v2" })
-	local schema = vim.json.decode(table.concat(output, ""))
-	if schema == nil then error("failed to decode schema from json") end
-	return { definitions = schema["definitions"] }
+---@param on_success function(table) definitions the definitions section of the schema
+local function kubectl_fetch_definitions(on_success)
+	cmd_async({ "kubectl", "get", "--raw", "/openapi/v2" }, function(output)
+		local schema = vim.json.decode(table.concat(output, ""))
+		if schema == nil then error("failed to decode schema from json") end
+		on_success({ definitions = schema["definitions"] })
+	end)
 end
 
 --- returns a list of kinds
 ---@return table
 local function kubectl_kinds()
-	return cmd({ "kubectl", "api-resources", "--no-headers" })
+	return cmd_blocking({ "kubectl", "api-resources", "--no-headers" })
 end
 
 --- patches the definitions to include an enum in the `kind` it exists
@@ -88,13 +128,18 @@ local function generate_oneof_schema(definitions)
 end
 
 
-local function schema_generate()
-	local definitions = kubectl_fetch_definitions()
-	patch_definitions_kind(definitions)
-	local schema = generate_oneof_schema(definitions)
-	vim.fn.mkdir(PATH_DATA, "p")
-	vim.fn.writefile({ vim.json.encode(schema) }, PATH_SCHEMA)
-	vim.fn.writefile({ vim.json.encode(definitions) }, PATH_DEFINITIONS)
+---@param on_generate? function()
+local function schema_generate(on_generate)
+	kubectl_fetch_definitions(function(definitions)
+		patch_definitions_kind(definitions)
+		local schema = generate_oneof_schema(definitions)
+		vim.fn.mkdir(PATH_DATA, "p")
+		vim.fn.writefile({ vim.json.encode(schema) }, PATH_SCHEMA)
+		vim.fn.writefile({ vim.json.encode(definitions) }, PATH_DEFINITIONS)
+		if on_generate ~= nil then
+			on_generate()
+		end
+	end)
 end
 
 local function yamlls_is_patched()
@@ -124,11 +169,12 @@ end
 local M = {}
 
 function M.setup()
-	schema_generate()
-	if not yamlls_is_patched() then
-		yamlls_patch()
-		yamlls_restart()
-	end
+	schema_generate(function()
+		if not yamlls_is_patched() then
+			yamlls_patch()
+			yamlls_restart()
+		end
+	end)
 end
 
 function M.generate_schema()
