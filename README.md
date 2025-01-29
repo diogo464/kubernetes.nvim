@@ -16,6 +16,17 @@ To install using `lazy.nvim` just add the following line next to the other
 plugins.
 ```lua
 	{ 'diogo464/kubernetes.nvim' }
+        -- or
+	{ 
+          'diogo464/kubernetes.nvim',
+          opts = {
+            -- this can help with autocomplete. it sets the `additionalProperties` field on type definitions to false if it is not already present.
+            schema_strict = true,
+            -- true:  generate the schema every time the plugin starts
+            -- false: only generate the schema if the files don't already exists. run `:KubernetesGenerateSchema` manually to generate the schema if needed.
+            schema_generate_always = true,
+          }
+        }
 ```
 When the plugin is imported it will automatically generate and patch yamlls.
 The only configuration required is in setting up yamlls. To do that just
