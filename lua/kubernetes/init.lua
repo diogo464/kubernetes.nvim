@@ -76,7 +76,7 @@ local function cmd_async(args, on_success, on_error)
 	end
 end
 
---- fetches the current cluster'rs schema using kubectl
+--- fetches the current cluster's schema using kubectl
 ---@param on_success function(table) definitions the definitions section of the schema
 local function kubectl_fetch_definitions(on_success)
 	cmd_async({ "kubectl", "get", "--raw", "/openapi/v2" }, function(output)
