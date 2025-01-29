@@ -41,7 +41,7 @@ end
 --- errors if the job fails to start or the exit code is not 0.
 ---@param args string[]
 ---@param on_success function(string[])
----@param on_error function(number)
+---@param on_error? function(number)
 local function cmd_async(args, on_success, on_error)
 	local stdout = {}
 	local stderr = ""
