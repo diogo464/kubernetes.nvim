@@ -45,8 +45,10 @@ local unpack = unpack or table.unpack
 log.new = function(config, standalone)
 	config = vim.tbl_deep_extend("force", default_config, config)
 
-	local outfile = string.format('%s/%s/%s.log', vim.api.nvim_call_function('stdpath', { 'data' }), config.plugin,
-		config.plugin)
+	local outfiledir = string.format("%s/%s", vim.api.nvim_call_function("stdpath", { "data" }), config.plugin)
+	vim.fn.mkdir(outfiledir, "p")
+
+	local outfile = string.format("%s/%s.log", outfiledir, config.plugin)
 
 	local obj
 	if standalone then
