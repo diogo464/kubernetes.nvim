@@ -3,19 +3,19 @@ local log = require("kubernetes.log")
 local PATH_DATA = vim.fn.stdpath("data") .. "/kubernetes.nvim/"
 local PATH_DEFINITIONS = PATH_DATA .. "definitions.json"
 local PATH_SCHEMA = PATH_DATA .. "schema.json"
-local PATH_YAMLLS_VALIDATION_JS = vim.fn.stdpath("data") ..
-	"/mason/packages/yaml-language-server/node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js"
 local YAMLLS_PATCH_PATTERN = "isKubernetes && err.message === this.MATCHES_MULTIPLE"
 local YAMLLS_PATH_REPLACEMENT = "err.message === this.MATCHES_MULTIPLE"
 
 ---@class Options
 ---@field schema_strict boolean
 ---@field schema_generate_always boolean
+---@field yamlls_root string
 
 ---@type Options
 local DEFAULT_OPTIONS = {
 	schema_strict = true,
 	schema_generate_always = true,
+	yamlls_root = vim.fn.stdpath("data") .. "/mason/packages/yaml-language-server/",
 }
 
 ---@param tbl table
@@ -108,6 +108,13 @@ local function cmd_async(args, on_success, on_error)
 	end
 end
 
+---@param opts Options
+---@return string path yamlls validation js path
+local function yamlls_validation_js_path(opts)
+	return opts.yamlls_root ..
+	"/" .. "node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js"
+end
+
 --- fetches the current cluster's schema using kubectl
 ---@param on_success function(table) definitions the definitions section of the schema
 local function kubectl_fetch_definitions(on_success)
@@ -195,8 +202,10 @@ local function schema_generate(opts, on_generate)
 	end)
 end
 
-local function yamlls_is_patched()
-	local lines = vim.fn.readfile(PATH_YAMLLS_VALIDATION_JS)
+---@param opts Options
+local function yamlls_is_patched(opts)
+	local yamlls_validation_js = yamlls_validation_js_path(opts)
+	local lines = vim.fn.readfile(yamlls_validation_js)
 	for _, line in ipairs(lines) do
 		if string.match(line, YAMLLS_PATCH_PATTERN) then
 			return false
@@ -205,15 +214,17 @@ local function yamlls_is_patched()
 	return true
 end
 
-local function yamlls_patch()
-	log.debug("patching yamlls file at ", PATH_YAMLLS_VALIDATION_JS)
-	local lines = vim.fn.readfile(PATH_YAMLLS_VALIDATION_JS)
+---@param opts Options
+local function yamlls_patch(opts)
+	local yamlls_validation_js = yamlls_validation_js_path(opts)
+	log.debug("patching yamlls file at ", yamlls_validation_js)
+	local lines = vim.fn.readfile(yamlls_validation_js)
 	for index, line in ipairs(lines) do
 		if string.match(line, YAMLLS_PATCH_PATTERN) then
 			lines[index] = string.gsub(line, YAMLLS_PATCH_PATTERN, YAMLLS_PATH_REPLACEMENT)
 		end
 	end
-	vim.fn.writefile(lines, PATH_YAMLLS_VALIDATION_JS)
+	vim.fn.writefile(lines, yamlls_validation_js)
 end
 
 local function yamlls_restart()
@@ -231,8 +242,8 @@ function M.setup(o)
 
 	if M.opts.schema_generate_always or not schema_exists() then
 		schema_generate(M.opts, function()
-			if not yamlls_is_patched() then
-				yamlls_patch()
+			if not yamlls_is_patched(M.opts) then
+				yamlls_patch(M.opts)
 				yamlls_restart()
 			end
 		end)
@@ -266,11 +277,11 @@ function M.yamlls_filetypes()
 end
 
 function M.yamlls_patch()
-	return yamlls_patch()
+	return yamlls_patch(M.opts)
 end
 
 function M.yamlls_is_patched()
-	return yamlls_is_patched()
+	return yamlls_is_patched(M.opts)
 end
 
 vim.api.nvim_create_user_command("KubernetesGenerateSchema", function()

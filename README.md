@@ -25,6 +25,8 @@ plugins.
             -- true:  generate the schema every time the plugin starts
             -- false: only generate the schema if the files don't already exists. run `:KubernetesGenerateSchema` manually to generate the schema if needed.
             schema_generate_always = true,
+            -- root path of the yamlls language server. by default it is assumed you are using mason but if not this option allows changing that path.
+	    yamlls_root = vim.fn.stdpath("data") .. "/mason/packages/yaml-language-server/",
           }
         }
 ```
