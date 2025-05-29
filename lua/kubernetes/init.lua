@@ -9,13 +9,17 @@ local YAMLLS_PATH_REPLACEMENT = "err.message === this.MATCHES_MULTIPLE"
 ---@class Options
 ---@field schema_strict boolean
 ---@field schema_generate_always boolean
----@field yamlls_root string
+---@field patch boolean If false, don't try to patch yaml-language-server.
+---@field yamlls_root function():string
 
 ---@type Options
 local DEFAULT_OPTIONS = {
 	schema_strict = true,
 	schema_generate_always = true,
-	yamlls_root = vim.fn.stdpath("data") .. "/mason/packages/yaml-language-server/",
+        patch = true,
+	yamlls_root = function()
+                return vim.fs.joinpath(vim.fn.stdpath("data"), "mason/packages/yaml-language-server")
+        end
 }
 
 ---@param tbl table
@@ -111,8 +115,9 @@ end
 ---@param opts Options
 ---@return string path yamlls validation js path
 local function yamlls_validation_js_path(opts)
-	return opts.yamlls_root ..
-	"/" .. "node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js"
+        local root = opts.yamlls_root()
+
+	return vim.fs.joinpath(root, "node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js")
 end
 
 --- fetches the current cluster's schema using kubectl
@@ -242,7 +247,7 @@ function M.setup(o)
 
 	if M.opts.schema_generate_always or not schema_exists() then
 		schema_generate(M.opts, function()
-			if not yamlls_is_patched(M.opts) then
+			if M.opts.patch and not yamlls_is_patched(M.opts) then
 				yamlls_patch(M.opts)
 				yamlls_restart()
 			end
