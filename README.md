@@ -17,7 +17,7 @@ plugins.
 ```lua
 	{ 'diogo464/kubernetes.nvim' }
         -- or
-	{ 
+	{
           'diogo464/kubernetes.nvim',
           opts = {
             -- this can help with autocomplete. it sets the `additionalProperties` field on type definitions to false if it is not already present.
@@ -25,8 +25,12 @@ plugins.
             -- true:  generate the schema every time the plugin starts
             -- false: only generate the schema if the files don't already exists. run `:KubernetesGenerateSchema` manually to generate the schema if needed.
             schema_generate_always = true,
+            -- Patch yaml-language-server's validation.js file.
+            patch = true,
             -- root path of the yamlls language server. by default it is assumed you are using mason but if not this option allows changing that path.
-	    yamlls_root = vim.fn.stdpath("data") .. "/mason/packages/yaml-language-server/",
+	        yamlls_root = function()
+                    return vim.fs.joinpath(vim.fn.stdpath("data"), "/mason/packages/yaml-language-server/")
+            end
           }
         }
 ```
@@ -96,14 +100,14 @@ them.
 
 So to add support here are the steps:
 
-1. Fetch the all the resource definitions from the cluster.\ 
+1. Fetch the all the resource definitions from the cluster.\
 This can be achieved like so: `kubectl get --raw /openapi/v2 | jq '.definitions'`.
 
-2. Generate a `definitions.json` and `schema.json`.\ 
+2. Generate a `definitions.json` and `schema.json`.\
 The `schema.json` is that `all.json` file that has the `oneOf`.
 To do this just get all iterate the `definitions.json` and add the appropriate entry into `schema.json`. To reference a local file use `file://<full path>#/definitions/...`.
 
-3. Patch the yaml language server.\ 
+3. Patch the yaml language server.\
 Right now kubernetes support seems to be hardcoded into `yamlls`. Trying to use this generated schema without modifications will give out the error `Matches multiple schemas when only one must validate.`. The language server has an check to see if the current document is a kubernetes document and if so then ignore that error.
 ```
 https://github.com/redhat-developer/yaml-language-server/blob/ed03cbf71ade29ea62b4bcac0d8952195fd6969d/src/languageservice/services/yamlValidation.ts#L122
