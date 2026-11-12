@@ -117,9 +117,20 @@ end
 ---@param opts Options
 ---@return string path yamlls validation js path
 local function yamlls_validation_js_path(opts)
-        local root = opts.yamlls_root()
-
-	return vim.fs.joinpath(root, "node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js")
+	local root = opts.yamlls_root()
+	local paths = {
+		-- yamlls < 2.0.0
+		vim.fs.joinpath(root, "node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js"),
+		-- yamlls >= 2.0.0
+		vim.fs.joinpath(root, "node_modules/yaml-language-server/out/src/languageservice/services/yamlValidation.js"),
+	}
+	for _, path in ipairs(paths) do
+		if vim.fn.filereadable(path) == 1 then
+			return path
+		end
+	end
+	-- report the missing legacy path so a broken yamlls install errors like before
+	return paths[1]
 end
 
 --- fetches the current cluster's schema using kubectl
