@@ -138,26 +138,47 @@ local function kubectl_kinds()
 	return cmd_blocking({ "kubectl", "api-resources", "--no-headers" })
 end
 
---- patches the definitions to include an enum in the `kind` it exists
+--- adds `value` to the `enum` of a property, if it isn't already there
+---@param property table
+---@param value string
+local function add_enum_value(property, value)
+	property.enum = property.enum or {}
+	for _, v in ipairs(property.enum) do
+		if v == value then
+			return
+		end
+	end
+	property.enum[#property.enum + 1] = value
+end
+
+--- patches the definitions to include `kind` and `apiVersion` enums on
+--- top-level resources. these enums are derived from the
+--- `x-kubernetes-group-version-kind` extension, which is only present on
+--- resource definitions. nested types that also have a `kind` property (for
+--- example `ObjectReference`) are left untouched.
+--- the `apiVersion` enum also lets yamlls tell apart definitions of the same
+--- kind served under different group versions, like autoscaling/v1 and
+--- autoscaling/v2 HorizontalPodAutoscaler.
 ---@param definitions table
-local function patch_definitions_kind(definitions)
-	for key, resource in pairs(definitions.definitions) do
-		if resource.properties ~= nil and resource.properties.kind ~= nil then
-			local kind = resource.properties.kind
-			local parts = vim.split(key, ".", { plain = true })
-			local name = parts[#parts]
-			local insert = true
-			if kind.enum ~= nil then
-				for _, v in ipairs(kind.enum) do
-					if v == name then
-						insert = false
-						break
+local function patch_definitions_gvk(definitions)
+	for _, resource in pairs(definitions.definitions) do
+		local gvks = resource["x-kubernetes-group-version-kind"]
+		local properties = resource.properties
+		if gvks ~= nil and properties ~= nil then
+			for _, gvk in ipairs(gvks) do
+				-- "__internal" versions are not served by the api server
+				if gvk.version ~= nil and gvk.version ~= "__internal" then
+					if properties.kind ~= nil and gvk.kind ~= nil then
+						add_enum_value(properties.kind, gvk.kind)
+					end
+					if properties.apiVersion ~= nil then
+						local api_version = gvk.version
+						if gvk.group ~= nil and gvk.group ~= "" then
+							api_version = gvk.group .. "/" .. gvk.version
+						end
+						add_enum_value(properties.apiVersion, api_version)
 					end
 				end
-			end
-			if insert then
-				kind.enum = kind.enum or {}
-				kind.enum[#kind.enum + 1] = name
 			end
 		end
 	end
@@ -192,7 +213,7 @@ end
 local function schema_generate(opts, on_generate)
 	log.debug("starting schema generation")
 	kubectl_fetch_definitions(function(definitions)
-		patch_definitions_kind(definitions)
+		patch_definitions_gvk(definitions)
 		if opts.schema_strict then
 			patch_definitions_strict(definitions)
 		end
