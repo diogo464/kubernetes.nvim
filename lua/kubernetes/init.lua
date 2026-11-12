@@ -3,7 +3,9 @@ local log = require("kubernetes.log")
 local PATH_DATA = vim.fn.stdpath("data") .. "/kubernetes.nvim/"
 local PATH_DEFINITIONS = PATH_DATA .. "definitions.json"
 local PATH_SCHEMA = PATH_DATA .. "schema.json"
-local YAMLLS_PATCH_PATTERN = "isKubernetes && err.message === this.MATCHES_MULTIPLE"
+-- matches both the old (`isKubernetes`) and the current
+-- (`suppressKubernetesMatchesMultiple`) guard variables used by yamlls
+local YAMLLS_PATCH_PATTERN = "([%w_]+) && err%.message === this%.MATCHES_MULTIPLE"
 local YAMLLS_PATH_REPLACEMENT = "err.message === this.MATCHES_MULTIPLE"
 
 ---@class Options
