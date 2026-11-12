@@ -183,6 +183,25 @@ local function generate_oneof_schema(definitions)
 	return { oneOf = oneOf }
 end
 
+--- patches definitions that kubernetes accepts as either a number or a string
+--- but that the openapi schema describes as plain strings. without this,
+--- yamlls rejects valid values like `targetPort: 9376` and `cpu: 1`.
+---@param definitions table
+local function patch_definitions_number_or_string(definitions)
+	for _, resource in pairs(definitions.definitions) do
+		-- ex: io.k8s.apimachinery.pkg.util.intstr.IntOrString
+		if resource.format == "int-or-string" then
+			resource.type = { "string", "integer" }
+			resource.format = nil
+		end
+	end
+	-- quantities accept numbers as well, ex: requests.cpu: 1
+	local quantity = definitions.definitions["io.k8s.apimachinery.pkg.api.resource.Quantity"]
+	if quantity ~= nil and quantity.type == "string" then
+		quantity.type = { "string", "number" }
+	end
+end
+
 local function schema_exists()
 	return vim.fn.filereadable(PATH_SCHEMA) and vim.fn.filereadable(PATH_DEFINITIONS)
 end
@@ -193,6 +212,7 @@ local function schema_generate(opts, on_generate)
 	log.debug("starting schema generation")
 	kubectl_fetch_definitions(function(definitions)
 		patch_definitions_kind(definitions)
+		patch_definitions_number_or_string(definitions)
 		if opts.schema_strict then
 			patch_definitions_strict(definitions)
 		end
