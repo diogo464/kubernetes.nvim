@@ -3,7 +3,9 @@ local log = require("kubernetes.log")
 local PATH_DATA = vim.fn.stdpath("data") .. "/kubernetes.nvim/"
 local PATH_DEFINITIONS = PATH_DATA .. "definitions.json"
 local PATH_SCHEMA = PATH_DATA .. "schema.json"
-local YAMLLS_PATCH_PATTERN = "isKubernetes && err.message === this.MATCHES_MULTIPLE"
+-- matches both the old (`isKubernetes`) and the current
+-- (`suppressKubernetesMatchesMultiple`) guard variables used by yamlls
+local YAMLLS_PATCH_PATTERN = "([%w_]+) && err%.message === this%.MATCHES_MULTIPLE"
 local YAMLLS_PATH_REPLACEMENT = "err.message === this.MATCHES_MULTIPLE"
 
 ---@class Options
@@ -115,9 +117,20 @@ end
 ---@param opts Options
 ---@return string path yamlls validation js path
 local function yamlls_validation_js_path(opts)
-        local root = opts.yamlls_root()
-
-	return vim.fs.joinpath(root, "node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js")
+	local root = opts.yamlls_root()
+	local paths = {
+		-- yamlls < 2.0.0
+		vim.fs.joinpath(root, "node_modules/yaml-language-server/out/server/src/languageservice/services/yamlValidation.js"),
+		-- yamlls >= 2.0.0
+		vim.fs.joinpath(root, "node_modules/yaml-language-server/out/src/languageservice/services/yamlValidation.js"),
+	}
+	for _, path in ipairs(paths) do
+		if vim.fn.filereadable(path) == 1 then
+			return path
+		end
+	end
+	-- report the missing legacy path so a broken yamlls install errors like before
+	return paths[1]
 end
 
 --- fetches the current cluster's schema using kubectl
@@ -204,6 +217,25 @@ local function generate_oneof_schema(definitions)
 	return { oneOf = oneOf }
 end
 
+--- patches definitions that kubernetes accepts as either a number or a string
+--- but that the openapi schema describes as plain strings. without this,
+--- yamlls rejects valid values like `targetPort: 9376` and `cpu: 1`.
+---@param definitions table
+local function patch_definitions_number_or_string(definitions)
+	for _, resource in pairs(definitions.definitions) do
+		-- ex: io.k8s.apimachinery.pkg.util.intstr.IntOrString
+		if resource.format == "int-or-string" then
+			resource.type = { "string", "integer" }
+			resource.format = nil
+		end
+	end
+	-- quantities accept numbers as well, ex: requests.cpu: 1
+	local quantity = definitions.definitions["io.k8s.apimachinery.pkg.api.resource.Quantity"]
+	if quantity ~= nil and quantity.type == "string" then
+		quantity.type = { "string", "number" }
+	end
+end
+
 local function schema_exists()
 	return vim.fn.filereadable(PATH_SCHEMA) and vim.fn.filereadable(PATH_DEFINITIONS)
 end
@@ -214,6 +246,7 @@ local function schema_generate(opts, on_generate)
 	log.debug("starting schema generation")
 	kubectl_fetch_definitions(function(definitions)
 		patch_definitions_gvk(definitions)
+		patch_definitions_number_or_string(definitions)
 		if opts.schema_strict then
 			patch_definitions_strict(definitions)
 		end
